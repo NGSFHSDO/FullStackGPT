@@ -9,7 +9,7 @@ from langchain.storage import LocalFileStore
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema.runnable import RunnablePassthrough, RunnableLambda
 from langchain.callbacks.base import BaseCallbackHandler
-from langchain.memory import ConversationSummaryBufferMemory
+from langchain.memory import ConversationBufferMemory
 
 
 st.set_page_config(
@@ -52,8 +52,8 @@ def embed_file(file):
     )
     loader = UnstructuredFileLoader(file_path)
     docs = loader.load_and_split(text_splitter=splitter)
+    
     embedder = OpenAIEmbeddings()
-
     cache_dir = LocalFileStore(f"./.cache/embeddings/{file.name}")
     cache_embedder = CacheBackedEmbeddings.from_bytes_store(embedder, cache_dir)
     vectorstore = FAISS.from_documents(docs, cache_embedder)
@@ -85,7 +85,7 @@ def load_memory(_):
     return memory.load_memory_variables({})["chat_history"]
 
 
-memory = ConversationSummaryBufferMemory(
+memory = ConversationBufferMemory(
     llm=llm,
     return_messages=True,
     max_token_limit=80,

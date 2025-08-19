@@ -1,22 +1,25 @@
+import time
 import streamlit as st
-from langchain.prompts import ChatPromptTemplate
 
 st.set_page_config(
-    page_title="God damm",
-    page_icon="👋",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    page_title="Home",
+    page_icon="☠️",
 )
 
-with st.sidebar:
-    st.title("God damm")
+st.title("GPT")
+
+st.markdown(
+    """
+# Go fuck yourself
+- [DocumentGPT](/DocumentGPT)
+- [PrivateGPT](/PrivateGPT)
+- [QuizGPT](/QuizGPT)
+- [SiteGPT](/SiteGPT)
+- [MeetingGPT](/MeetingGPT)
+- [InvestorGPT](/InvestorGPT)
 
 
-st.write("Is it fucking possible?")
-    
-
-
-st.title("My First Streamlit App")
-
+"""
+)
 
 

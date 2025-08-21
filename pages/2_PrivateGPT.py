@@ -1,9 +1,10 @@
 import time
 import streamlit as st
-from langchain.chat_models import ChatOpenAI
+from langchain.chat_models import ChatOpenAI, ChatOllama
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
+# Ollama Embedding
+from langchain.embeddings import OllamaEmbeddings, OpenAIEmbeddings, CacheBackedEmbeddings 
 from langchain.vectorstores import Chroma, FAISS
 from langchain.storage import LocalFileStore
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -30,14 +31,15 @@ class ChatCallbackHandler(BaseCallbackHandler):
         self.message += token 
         self.message_box.markdown(self.message)
 
-llm = ChatOpenAI(
+llm = ChatOllama(
+    model="mistral:latest", ##Ollama는 모델 명시해야됨.
     temperature=0.1,
     streaming=True,
     callbacks=[ChatCallbackHandler()],
 )
 
 
-# 파일첨부시에만 load, split, embed, store, retrive함
+# 파일이 첨부될때?만 load, split, embed, store, retrive함
 @st.cache_data(show_spinner="I'm embedding you")
 def embed_file(file):
     file_content = file.read()
@@ -53,7 +55,9 @@ def embed_file(file):
     loader = UnstructuredFileLoader(file_path)
     docs = loader.load_and_split(text_splitter=splitter)
     
-    embedder = OpenAIEmbeddings()
+    embedder = OllamaEmbeddings(
+        model="mistral:latest" ##Ollama는 모델 명시해야됨.
+    )
     cache_dir = LocalFileStore(f"./.cache/private_embeddings/{file.name}")
     cache_embedder = CacheBackedEmbeddings.from_bytes_store(embedder, cache_dir)
     vectorstore = FAISS.from_documents(docs, cache_embedder)
@@ -145,3 +149,100 @@ if file:
             )
 else:
     st.session_state.messages = []
+
+    
+
+# ### Ollama 객체가 non-pickle이라 pickle이 자꾸 터짐... embedding까지는 잘되는듯
+# st.set_page_config(
+#     page_title="I'm fucking testing.",
+#     page_icon="☠️",
+# )
+
+# if "messages" not in st.session_state:
+#     st.session_state.messages = []
+
+
+# class ChatCallbackHandler(BaseCallbackHandler):
+#     message = ""
+#     def on_llm_start(self, *args, **kwargs):
+#         self.message_box = st.empty()
+
+#     def on_llm_end(self, *args, **kwargs):
+#         save_message(self.message, "ai")
+
+#     def on_llm_new_token(self, token, *args, **kwargs):
+#         self.message += token 
+#         self.message_box.markdown(self.message)
+
+# llm = ChatOllama(
+#     model="mistral:latest", ##Ollama는 모델 명시해야됨.
+#     temperature=0.1,
+#     streaming=True,
+#     callbacks=[ChatCallbackHandler()],
+# )
+
+# def save_message(message, role):
+#     st.session_state.messages.append({"message": message, "role": role})
+
+
+# def send_message(message, role, save=True):
+#     with st.chat_message(role):
+#         st.markdown(message)
+#     if save:
+#         save_message(message, role)
+        
+
+
+# def paint_history():
+#     for message in st.session_state.messages:
+#         send_message(message["message"], message["role"], save=False)
+
+# def load_memory(_):
+#     return memory.load_memory_variables({})["chat_history"]
+
+# memory = ConversationBufferMemory(
+#     llm=llm,
+#     return_messages=True,
+#     max_token_limit=80,
+#     memory_key="chat_history"
+# )
+# prompt = ChatPromptTemplate.from_messages(
+#     [
+#         (
+#             "system",
+#             """
+#             If you don't know the answer just say you don't know. DON'T make anything up.
+#             """,
+#         ),
+#         MessagesPlaceholder(variable_name="chat_history"),
+#         ("human", "{question}"),
+#     ]
+# )
+
+
+# st.title("PrivateGPT")
+# st.markdown(
+#     """
+#     Who the fuck are you?
+# """
+# )
+
+# send_message("Lets Fucking Go", "ai", save=False)
+# paint_history()
+# message = st.chat_input("LFG")
+# if message:
+#     send_message(message, "user")
+#     chain = (
+#         {"question": RunnablePassthrough()}
+#         | RunnablePassthrough.assign(chat_history=load_memory)
+#         | prompt
+#         | llm
+#     )   
+#     with st.chat_message("ai"):
+#         response = chain.invoke(message)
+#         memory.save_context(
+#             {"input": message},
+#             {"output": response.content},
+#         )
+# else:
+#     st.session_state.messages = []

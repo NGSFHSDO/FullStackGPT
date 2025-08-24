@@ -9,19 +9,14 @@ from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.schema.output_parser import StrOutputParser
 
 llm = ChatOpenAI(
     temperature=0.1
 )
 
-
-has_transcript = os.path.exists("./.cache/transcript.txt")
-
-
 @st.cache_data()
 def transcribe_chunks(chunk_folder, destination):
-    if has_transcript:
-        return
     files = glob.glob(f"{chunk_folder}/*.mp3")
     files.sort()
     for file in files:
@@ -35,9 +30,7 @@ def transcribe_chunks(chunk_folder, destination):
 
 @st.cache_data()
 def extract_audio_from_video(video_path):
-    if has_transcript:
-        return
-    audio_path = video_path.replace("mp4", "mp3")
+    audio_path = video_path.rsplit(".", 1)[0] + ".mp3"
     command = [
         "ffmpeg",
         "-y",
@@ -51,8 +44,6 @@ def extract_audio_from_video(video_path):
 
 @st.cache_data()
 def cut_audio_in_chunks(audio_path, chunk_size, chunks_folder):
-    if has_transcript:
-        return
     track = AudioSegment.from_mp3(audio_path)
     chunk_len = chunk_size * 60 * 1000
     chunks = math.ceil(len(track) / chunk_len)
@@ -114,9 +105,52 @@ if video:
     with summary_tab:
         LFG = st.button("LFG")
         if LFG:
-            loader = TextLoader(transcript_path)
+            loader = TextLoader(transcript_path, encoding="utf-8")
             splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-                chunk_size=800,
-                chunk_overlap=100,
+                chunk_size=1000,
+                chunk_overlap=200,
             )
             docs = loader.load_and_split(text_splitter=splitter)
+
+
+            first_summary_prompt = ChatPromptTemplate.from_template(
+                """
+                Write a concise summary of the following:
+                "{text}"
+                CONCISE SUMMARY:                
+            """
+            )
+            first_summary_chain = first_summary_prompt | llm | StrOutputParser()
+            summary = first_summary_chain.invoke(
+                {"text": docs[0].page_content},
+            )
+
+
+            refine_prompt = ChatPromptTemplate.from_template(
+                """
+                Your job is to produce a final, consolidated summary.
+                An existing summary is provided: {existing_summary}
+                Refine the existing summary by incorporating the following new context.
+                ------------
+                {context}
+                ------------
+                Given the new context, refine the original summary. If the context isn't useful, return the original summary.
+                Output ONLY the refined summary, without any other text.
+                """
+            )
+            refine_chain = refine_prompt | llm | StrOutputParser()
+
+            with st.status("Summarizing...") as status:
+                for i, doc in enumerate(docs[1:]):
+                    status.update(label=f"Summarizing chunk {i+1}/{len(docs)-1}...")    
+                    summary = refine_chain.invoke(
+                        {
+                            "existing_summary": summary,
+                            "context": doc.page_content,
+                        }
+                    )
+            st.write(summary)
+    with chat_tab:
+        st.write("귀찮아서 안할꺼임.")
+
+        
